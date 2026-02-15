@@ -72,5 +72,5 @@ Dieses Software-Projekt dient rein informativen Zwecken zur Visualisierung öffe
 1.  **Keine Gewährleistung:** Es wird keine Garantie für die Richtigkeit, Vollständigkeit oder Aktualität der dargestellten Daten übernommen.
 2.  **Keine Beratung:** Die dargestellten Informationen, insbesondere Hinweise auf kritische Füllstände, stellen keine offizielle Prognose oder Warnung im Sinne des Katastrophenschutzes dar.
 3.  **Datenhoheit:** Die Rechte an den Rohdaten liegen beim jeweiligen Anbieter (GIE/AGSI).
-4. **Aktualität der Daten:** Die Schnittstelle ist nicht tagesgenau weil Daten des Anbieters erst geprüft um zum Teil spät Abends nochmals aktualisert werden. Meist handelt es sich um die Daten des Vortages, am Wochenende scheint die Belieferung zu ruhen.
+4. **Aktualität der Daten:** Die Schnittstelle ist nicht tagesgenau weil Daten des Anbieters erst geprüft und zum Teil spät Abends nochmals nachaktualisiert werden. Üblicherweise handelt es sich um die Daten des Vortages, am Wochenende scheint die Belieferung zu ruhen.
 5. **Offizielle Daten:** Jederzeit können Sie die offiziellen Daten unter [GIE (Gas Infrastructure Europe)](https://agsi.gie.eu) direkt einsehen. Dort wird für den Gas-Tag ein Überblick über die europäischen Länder gegeben. Über Drill-Down lassen sich dann Lieferstandorte der Länder und deren derzeitige Gas-Füllstände einsehen.
