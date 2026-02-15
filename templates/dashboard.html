@@ -1,1 +1,1373 @@
+<!doctype html>
+<html lang="en">
+    <head>
+        <meta charset="UTF-8" />
+        <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+        <title>🇩🇪 German Gas Storage Monitor</title>
 
+        <!-- Plotly.js 3.x -->
+        <script
+            src="https://cdn.plot.ly/plotly-3.3.1.min.js"
+            charset="utf-8"
+        ></script>
+
+        <style>
+            :root {
+                --bg: #f8f9fa;
+                --card: #ffffff;
+                --border: #e9ecef;
+                --text: #2c3e50;
+                --text-muted: #7f8c8d;
+                --primary: #004080;
+                --primary-light: rgba(0, 64, 128, 0.08);
+                --danger: #e74c3c;
+                --success: #27ae60;
+                --warning: #f39c12;
+                --radius: 8px;
+                --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+                --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.12);
+                --transition: 0.2s ease;
+
+                /* Chart colors */
+                --chart-bg: rgba(250, 251, 252, 1);
+                --chart-paper: white;
+                --chart-grid: rgba(189, 195, 199, 0.25);
+                --chart-hover-bg: rgba(255, 255, 255, 0.97);
+                --chart-hover-border: #ddd;
+                --chart-legend-bg: rgba(255, 255, 255, 0.92);
+                --chart-legend-border: #ecf0f1;
+                --chart-modebar-bg: rgba(255, 255, 255, 0.7);
+                --chart-modebar-color: #7f8c8d;
+                --chart-annotation: #323232;
+
+                /* Season colors - light mode */
+                --season-current: #004080;
+                --season-current-fill: rgba(0, 64, 128, 0.18);
+                --season-prev: #e67e22;
+                --season-prev-fill: rgba(230, 126, 34, 0.1);
+                --season-old: #95a5a6;
+                --season-old-fill: rgba(149, 165, 166, 0.08);
+            }
+
+            [data-theme="dark"] {
+                --bg: #0d1117;
+                --card: #161b22;
+                --border: #30363d;
+                --text: #e6edf3;
+                --text-muted: #8b949e;
+                --primary: #4a9eff;
+                --primary-light: rgba(74, 158, 255, 0.12);
+                --danger: #ff6b6b;
+                --success: #51cf66;
+                --warning: #ffd43b;
+                --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.4);
+                --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.5);
+
+                /* Chart colors - dark mode */
+                --chart-bg: rgba(13, 17, 23, 1);
+                --chart-paper: #161b22;
+                --chart-grid: rgba(68, 76, 86, 0.3);
+                --chart-hover-bg: rgba(22, 27, 34, 0.97);
+                --chart-hover-border: #30363d;
+                --chart-legend-bg: rgba(22, 27, 34, 0.95);
+                --chart-legend-border: #30363d;
+                --chart-modebar-bg: rgba(22, 27, 34, 0.8);
+                --chart-modebar-color: #8b949e;
+                --chart-annotation: #e6edf3;
+
+                /* Season colors - dark mode (brightened for visibility) */
+                --season-current: #5eb3ff;
+                --season-current-fill: rgba(94, 179, 255, 0.15);
+                --season-prev: #ff9f4a;
+                --season-prev-fill: rgba(255, 159, 74, 0.12);
+                --season-old: #b4bcc4;
+                --season-old-fill: rgba(180, 188, 196, 0.1);
+            }
+
+            * {
+                margin: 0;
+                padding: 0;
+                box-sizing: border-box;
+            }
+
+            body {
+                font-family:
+                    "Inter",
+                    "Segoe UI",
+                    system-ui,
+                    -apple-system,
+                    sans-serif;
+                background: var(--bg);
+                color: var(--text);
+                min-height: 100vh;
+                display: flex;
+                flex-direction: column;
+                transition:
+                    background-color 0.3s ease,
+                    color 0.3s ease;
+            }
+
+            .header {
+                background: linear-gradient(
+                    135deg,
+                    var(--primary) 0%,
+                    #001a33 100%
+                );
+                color: white;
+                padding: 1rem 2rem;
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                box-shadow: var(--shadow-md);
+                position: sticky;
+                top: 0;
+                z-index: 100;
+            }
+
+            [data-theme="dark"] .header {
+                background: linear-gradient(135deg, #1f6feb 0%, #0d1117 100%);
+            }
+
+            .header h1 {
+                font-size: 1.3rem;
+                font-weight: 700;
+                display: flex;
+                align-items: center;
+                gap: 0.5rem;
+                white-space: nowrap;
+            }
+
+            .header-meta {
+                display: flex;
+                align-items: center;
+                gap: 1rem;
+                font-size: 0.82rem;
+                opacity: 0.9;
+            }
+
+            .header-actions {
+                display: flex;
+                gap: 0.5rem;
+                align-items: center;
+            }
+
+            .status-dot {
+                width: 8px;
+                height: 8px;
+                border-radius: 50%;
+                display: inline-block;
+                margin-right: 4px;
+                animation: pulse 2s infinite;
+            }
+
+            .status-dot.live {
+                background: var(--success);
+            }
+            .status-dot.stale {
+                background: var(--warning);
+            }
+
+            @keyframes pulse {
+                0%,
+                100% {
+                    opacity: 1;
+                }
+                50% {
+                    opacity: 0.4;
+                }
+            }
+
+            .btn {
+                background: rgba(255, 255, 255, 0.12);
+                border: 1px solid rgba(255, 255, 255, 0.25);
+                color: white;
+                padding: 0.4rem 0.9rem;
+                border-radius: var(--radius);
+                cursor: pointer;
+                font-size: 0.78rem;
+                font-weight: 500;
+                transition: all var(--transition);
+                display: flex;
+                align-items: center;
+                gap: 0.3rem;
+                backdrop-filter: blur(4px);
+            }
+
+            .btn:hover {
+                background: rgba(255, 255, 255, 0.22);
+                transform: translateY(-1px);
+                box-shadow: 0 2px 8px rgba(0, 0, 0, 0.2);
+            }
+
+            .btn:active {
+                transform: translateY(0);
+            }
+            .btn.loading {
+                opacity: 0.5;
+                pointer-events: none;
+            }
+
+            .btn .spinner-sm {
+                width: 14px;
+                height: 14px;
+                border: 2px solid rgba(255, 255, 255, 0.3);
+                border-top-color: white;
+                border-radius: 50%;
+                animation: spin 0.6s linear infinite;
+                display: none;
+            }
+
+            .btn.loading .spinner-sm {
+                display: inline-block;
+            }
+            .btn.loading .btn-text {
+                display: none;
+            }
+
+            @keyframes spin {
+                to {
+                    transform: rotate(360deg);
+                }
+            }
+
+            /* Dark mode toggle button */
+            .theme-toggle {
+                width: 36px;
+                height: 36px;
+                padding: 0;
+                border-radius: 50%;
+                justify-content: center;
+                position: relative;
+                overflow: hidden;
+            }
+
+            .theme-toggle svg {
+                width: 18px;
+                height: 18px;
+                position: absolute;
+                transition: all 0.3s ease;
+            }
+
+            .theme-toggle .sun-icon {
+                opacity: 1;
+                transform: rotate(0deg) scale(1);
+            }
+
+            .theme-toggle .moon-icon {
+                opacity: 0;
+                transform: rotate(90deg) scale(0);
+            }
+
+            [data-theme="dark"] .theme-toggle .sun-icon {
+                opacity: 0;
+                transform: rotate(-90deg) scale(0);
+            }
+
+            [data-theme="dark"] .theme-toggle .moon-icon {
+                opacity: 1;
+                transform: rotate(0deg) scale(1);
+            }
+
+            .kpi-strip {
+                display: grid;
+                grid-template-columns: repeat(4, 1fr);
+                gap: 0.8rem;
+                padding: 0.8rem 2rem;
+                background: var(--card);
+                border-bottom: 1px solid var(--border);
+                transition:
+                    background-color 0.3s ease,
+                    border-color 0.3s ease;
+            }
+
+            .kpi-card {
+                display: flex;
+                flex-direction: column;
+                padding: 0.7rem 0.9rem;
+                border-radius: var(--radius);
+                background: var(--bg);
+                border: 1px solid var(--border);
+                transition: all var(--transition);
+                position: relative;
+                overflow: hidden;
+            }
+
+            .kpi-card::before {
+                content: "";
+                position: absolute;
+                top: 0;
+                left: 0;
+                right: 0;
+                height: 3px;
+                background: var(--border);
+                transition: background var(--transition);
+            }
+
+            .kpi-card:hover {
+                transform: translateY(-2px);
+                box-shadow: var(--shadow-sm);
+            }
+
+            .kpi-card.accent-primary::before {
+                background: var(--primary);
+            }
+            .kpi-card.accent-danger::before {
+                background: var(--danger);
+            }
+            .kpi-card.accent-success::before {
+                background: var(--success);
+            }
+            .kpi-card.accent-warning::before {
+                background: var(--warning);
+            }
+
+            .kpi-label {
+                font-size: 0.68rem;
+                text-transform: uppercase;
+                letter-spacing: 0.06em;
+                color: var(--text-muted);
+                margin-bottom: 0.25rem;
+                font-weight: 600;
+            }
+
+            .kpi-value {
+                font-size: 1.5rem;
+                font-weight: 800;
+                line-height: 1.2;
+                font-variant-numeric: tabular-nums;
+            }
+
+            .kpi-sub {
+                font-size: 0.7rem;
+                color: var(--text-muted);
+                margin-top: 0.15rem;
+            }
+
+            .kpi-value.primary {
+                color: var(--primary);
+            }
+            .kpi-value.danger {
+                color: var(--danger);
+            }
+            .kpi-value.success {
+                color: var(--success);
+            }
+            .kpi-value.warning {
+                color: var(--warning);
+            }
+
+            .controls {
+                display: flex;
+                justify-content: space-between;
+                align-items: center;
+                padding: 0.6rem 2rem;
+                background: var(--card);
+                border-bottom: 1px solid var(--border);
+                flex-wrap: wrap;
+                gap: 0.5rem;
+                transition: all 0.3s ease;
+            }
+
+            .scenario-buttons {
+                display: flex;
+                gap: 0.35rem;
+                flex-wrap: wrap;
+            }
+
+            .scenario-btn {
+                padding: 0.42rem 0.85rem;
+                border: 2px solid var(--border);
+                border-radius: var(--radius);
+                background: var(--card);
+                cursor: pointer;
+                font-size: 0.78rem;
+                font-weight: 600;
+                transition: all var(--transition);
+                color: var(--text);
+                white-space: nowrap;
+            }
+
+            .scenario-btn:hover {
+                border-color: var(--primary);
+                background: var(--primary-light);
+            }
+
+            .scenario-btn.active {
+                border-color: var(--primary);
+                background: var(--primary);
+                color: white;
+                box-shadow: 0 2px 8px rgba(0, 64, 128, 0.3);
+            }
+
+            [data-theme="dark"] .scenario-btn.active {
+                box-shadow: 0 2px 8px rgba(74, 158, 255, 0.4);
+            }
+
+            .controls-right {
+                display: flex;
+                align-items: center;
+                gap: 0.8rem;
+                font-size: 0.75rem;
+                color: var(--text-muted);
+            }
+
+            .controls-right a {
+                color: var(--primary);
+                text-decoration: none;
+            }
+
+            .controls-right a:hover {
+                text-decoration: underline;
+            }
+
+            .chart-container {
+                flex: 1;
+                padding: 1.5rem 2rem;
+                background: var(--card);
+                transition: background-color 0.3s ease;
+            }
+
+            #dashboard {
+                width: 100%;
+                height: calc(100vh - 200px);
+                min-height: 600px;
+                border-radius: var(--radius);
+                overflow: hidden;
+            }
+
+            .footer {
+                padding: 0.8rem 2rem;
+                background: var(--card);
+                border-top: 1px solid var(--border);
+                color: var(--text-muted);
+                font-size: 0.7rem;
+                text-align: center;
+                transition: all 0.3s ease;
+            }
+
+            .footer a {
+                color: var(--primary);
+                text-decoration: none;
+            }
+
+            .footer a:hover {
+                text-decoration: underline;
+            }
+
+            @media (max-width: 1024px) {
+                .kpi-strip {
+                    grid-template-columns: repeat(2, 1fr);
+                }
+                .header-meta {
+                    display: none;
+                }
+            }
+
+            @media (max-width: 640px) {
+                .kpi-strip {
+                    grid-template-columns: 1fr;
+                    padding: 0.6rem 1rem;
+                }
+                .chart-container {
+                    padding: 1rem;
+                }
+                .header {
+                    padding: 0.8rem 1rem;
+                }
+                .header h1 {
+                    font-size: 1.1rem;
+                }
+                .controls {
+                    padding: 0.5rem 1rem;
+                }
+                .controls-right {
+                    display: none;
+                }
+            }
+
+            .spinner {
+                width: 48px;
+                height: 48px;
+                border: 4px solid var(--border);
+                border-top-color: var(--primary);
+                border-radius: 50%;
+                animation: spin 0.8s linear infinite;
+                margin: 3rem auto;
+            }
+
+            .error-box {
+                background: rgba(231, 76, 60, 0.08);
+                border: 1px solid var(--danger);
+                border-radius: var(--radius);
+                padding: 1rem 1.5rem;
+                margin: 2rem auto;
+                max-width: 600px;
+                color: var(--danger);
+            }
+
+            .error-box h3 {
+                margin-bottom: 0.5rem;
+                font-size: 1.1rem;
+            }
+
+            .error-box pre {
+                background: rgba(0, 0, 0, 0.05);
+                padding: 0.8rem;
+                border-radius: 4px;
+                overflow-x: auto;
+                font-size: 0.75rem;
+                margin-top: 0.5rem;
+            }
+
+            [data-theme="dark"] .error-box {
+                background: rgba(255, 107, 107, 0.12);
+            }
+
+            [data-theme="dark"] .error-box pre {
+                background: rgba(0, 0, 0, 0.3);
+            }
+        </style>
+    </head>
+    <body>
+        <div class="header">
+            <h1>🇩🇪 German Gas Storage Monitor</h1>
+            <div class="header-actions">
+                <div class="header-meta">
+                    <span id="lastUpdate">Loading...</span>
+                    <span id="statusBadge"></span>
+                </div>
+                <button
+                    class="btn theme-toggle"
+                    id="themeToggle"
+                    aria-label="Toggle dark mode"
+                >
+                    <svg
+                        class="sun-icon"
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    >
+                        <circle cx="12" cy="12" r="5"></circle>
+                        <line x1="12" y1="1" x2="12" y2="3"></line>
+                        <line x1="12" y1="21" x2="12" y2="23"></line>
+                        <line x1="4.22" y1="4.22" x2="5.64" y2="5.64"></line>
+                        <line
+                            x1="18.36"
+                            y1="18.36"
+                            x2="19.78"
+                            y2="19.78"
+                        ></line>
+                        <line x1="1" y1="12" x2="3" y2="12"></line>
+                        <line x1="21" y1="12" x2="23" y2="12"></line>
+                        <line x1="4.22" y1="19.78" x2="5.64" y2="18.36"></line>
+                        <line x1="18.36" y1="5.64" x2="19.78" y2="4.22"></line>
+                    </svg>
+                    <svg
+                        class="moon-icon"
+                        xmlns="http://www.w3.org/2000/svg"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                    >
+                        <path
+                            d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"
+                        ></path>
+                    </svg>
+                </button>
+                <button class="btn" id="refreshBtn">
+                    <div class="spinner-sm"></div>
+                    <span class="btn-text">🔄 Refresh</span>
+                </button>
+            </div>
+        </div>
+
+        <div class="kpi-strip" id="kpiStrip">
+            <div class="kpi-card accent-primary">
+                <div class="kpi-label">Current Fill</div>
+                <div class="kpi-value primary" id="kpiCurrentFill">—</div>
+                <div class="kpi-sub" id="kpiDate">—</div>
+            </div>
+            <div class="kpi-card accent-danger">
+                <div class="kpi-label">7-Day Change</div>
+                <div class="kpi-value" id="kpiDelta7">—</div>
+                <div class="kpi-sub">Trend indicator</div>
+            </div>
+            <div class="kpi-card accent-warning">
+                <div class="kpi-label">Avg Withdrawal</div>
+                <div class="kpi-value" id="kpiAvgWithdrawal">—</div>
+                <div class="kpi-sub">GWh/day (7d MA)</div>
+            </div>
+            <div class="kpi-card accent-success">
+                <div class="kpi-label">Days to Critical</div>
+                <div class="kpi-value" id="kpiDaysToCrit">—</div>
+                <div class="kpi-sub">At current trend</div>
+            </div>
+        </div>
+
+        <!-- Controls -->
+        <section class="controls">
+            <div class="scenario-buttons" id="scenarioButtons"></div>
+            <div class="controls-right">
+                <span
+                    >Source:
+                    <a
+                        href="https://agsi.gie.eu/"
+                        target="_blank"
+                        rel="noopener"
+                        >AGSI/GIE</a
+                    ></span
+                >
+                <span>·</span>
+                <span>Plotly.js 3.3.1</span>
+            </div>
+        </section>
+
+        <div class="chart-container">
+            <div id="dashboard"></div>
+        </div>
+
+        <div class="footer">
+            Data:
+            <a href="https://agsi.gie.eu/" target="_blank"
+                >AGSI+ Transparency Platform</a
+            >
+            • Updated every 2h • Press Ctrl+Click to pan charts
+        </div>
+
+        <script>
+            // ═══════════════════════════════════════════════════════
+            // Theme Management
+            // ═══════════════════════════════════════════════════════
+
+            let activeScenario = "Linear";
+
+            const themeToggle = document.getElementById("themeToggle");
+            const htmlElement = document.documentElement;
+
+            // Load saved theme or default to light
+            const savedTheme = localStorage.getItem("theme") || "light";
+            htmlElement.setAttribute("data-theme", savedTheme);
+
+            themeToggle.addEventListener("click", () => {
+                const currentTheme = htmlElement.getAttribute("data-theme");
+                const newTheme = currentTheme === "light" ? "dark" : "light";
+                htmlElement.setAttribute("data-theme", newTheme);
+                localStorage.setItem("theme", newTheme);
+
+                // Redraw chart with new colors
+                if (window.dashData) {
+                    renderDashboard(window.dashData);
+                }
+            });
+
+            // ═══════════════════════════════════════════════════════
+            // Scenario Buttons
+            // ═══════════════════════════════════════════════════════
+
+            function buildScenarioButtons() {
+                const container = document.getElementById("scenarioButtons");
+                container.innerHTML = "";
+
+                const configs = [
+                    { id: "Linear", label: "📉 Linear" },
+                    { id: "Stress", label: "❄️ Stress" },
+                    { id: "History", label: "📅 Historical" },
+                    { id: "All", label: "🔍 All" },
+                    { id: "None", label: "📊 Base Only" },
+                ];
+
+                for (const cfg of configs) {
+                    const btn = document.createElement("button");
+                    btn.className =
+                        "scenario-btn" +
+                        (activeScenario === cfg.id ? " active" : "");
+                    btn.textContent = cfg.label;
+                    btn.addEventListener("click", () => {
+                        activeScenario = cfg.id;
+                        container
+                            .querySelectorAll(".scenario-btn")
+                            .forEach((b) => b.classList.remove("active"));
+                        btn.classList.add("active");
+                        renderDashboard(window.dashData);
+                    });
+                    container.appendChild(btn);
+                }
+            }
+
+            // ═══════════════════════════════════════════════════════
+            // Theme-aware color getter
+            // ═══════════════════════════════════════════════════════
+
+            function getThemeColor(varName) {
+                return getComputedStyle(document.documentElement)
+                    .getPropertyValue(varName)
+                    .trim();
+            }
+
+            // ═══════════════════════════════════════════════════════
+            // Data Fetching & Refresh
+            // ═══════════════════════════════════════════════════════
+
+            const refreshBtn = document.getElementById("refreshBtn");
+            const statusBadge = document.getElementById("statusBadge");
+            const lastUpdate = document.getElementById("lastUpdate");
+
+            async function fetchData(forceRefresh = false) {
+                try {
+                    const endpoint = forceRefresh
+                        ? "/api/refresh"
+                        : "/api/data";
+                    console.log("Fetching data from:", endpoint);
+                    const resp = await fetch(endpoint);
+                    if (!resp.ok) {
+                        const err = await resp.json();
+                        throw new Error(err.error || "API error");
+                    }
+                    const data = await resp.json();
+                    console.log("Data received successfully");
+                    window.dashData = data;
+                    buildScenarioButtons();
+                    renderDashboard(data);
+                    updateKPIs(data.kpi);
+                    updateStatus(data.generatedAt);
+                } catch (err) {
+                    console.error("Fetch error:", err);
+                    showError(err);
+                }
+            }
+
+            refreshBtn.addEventListener("click", async () => {
+                refreshBtn.classList.add("loading");
+                await fetchData(true);
+                refreshBtn.classList.remove("loading");
+            });
+
+            function updateStatus(genTime) {
+                lastUpdate.textContent = `Updated: ${genTime}`;
+                const now = new Date();
+                const gen = new Date(genTime);
+                const ageMinutes = (now - gen) / 60000;
+                const isStale = ageMinutes > 150;
+
+                statusBadge.innerHTML = isStale
+                    ? '<span class="status-dot stale"></span>Stale'
+                    : '<span class="status-dot live"></span>Live';
+            }
+
+            function updateKPIs(kpi) {
+                // Current Fill %
+                const currFill = document.getElementById("kpiCurrentFill");
+                const currFillVal = kpi.currentFill;
+
+                currFill.textContent = currFillVal.toFixed(1) + "%";
+                currFill.className =
+                    currFillVal < 20
+                        ? "kpi-value danger"
+                        : currFillVal > 30
+                          ? "kpi-value success"
+                          : "kpi-value warning";
+
+                // Kri Date
+                document.getElementById("kpiDate").textContent =
+                    kpi.currentDate;
+
+                // Kpi Delta % Avg 7 days
+                const delta = document.getElementById("kpiDelta7");
+                const deltaVal = kpi.delta7d;
+                delta.textContent =
+                    (deltaVal > 0 ? "+" : "") + deltaVal.toFixed(2) + "%";
+                delta.className =
+                    deltaVal < -7
+                        ? "kpi-value danger"
+                        : deltaVal > -3
+                          ? "kpi-value success"
+                          : "kpi-value warning";
+
+                // Kpi Average WithDrawal 7 days
+                const avg7 = document.getElementById("kpiAvgWithdrawal");
+                const avg7Val = Math.abs(kpi.avgWithdrawal);
+
+                avg7.textContent = avg7Val.toFixed(0);
+                avg7.className =
+                    avg7Val > 2500
+                        ? "kpi-value danger"
+                        : avg7Val < 1500
+                          ? "kpi-value success"
+                          : "kpi-value warning";
+
+                const daysToCrit = document.getElementById("kpiDaysToCrit");
+                if (kpi.daysToCrit < 999) {
+                    daysToCrit.textContent = kpi.daysToCrit;
+                    daysToCrit.className =
+                        kpi.daysToCrit < 10
+                            ? "kpi-value danger"
+                            : kpi.daysToCrit < 30
+                              ? "kpi-value warning"
+                              : "kpi-value success";
+                } else {
+                    daysToCrit.textContent = "N/A";
+                    daysToCrit.className = "kpi-value";
+                }
+            }
+
+            function showError(err) {
+                const container = document.querySelector(".chart-container");
+                container.innerHTML = `
+                    <div class="error-box">
+                        <h3>⚠️ Error Loading Data</h3>
+                        <p>${err.message}</p>
+                        <pre>${err.stack || ""}</pre>
+                    </div>
+                `;
+            }
+
+            // ═══════════════════════════════════════════════════════
+            // Chart Rendering
+            // ═══════════════════════════════════════════════════════
+
+            function renderDashboard(dashData) {
+                if (!dashData) {
+                    console.error("No dashboard data provided");
+                    return;
+                }
+
+                if (!dashData.seasons || dashData.seasons.length === 0) {
+                    console.error("No season data available");
+                    return;
+                }
+
+                console.log(
+                    "Rendering dashboard with",
+                    dashData.seasons.length,
+                    "seasons",
+                );
+
+                const traces = [];
+                const xRange = [0, 151];
+
+                // Get theme-aware colors
+                const currentTheme = htmlElement.getAttribute("data-theme");
+                const isDark = currentTheme === "dark";
+
+                const seasonCurrent = getThemeColor("--season-current");
+                const seasonCurrentFill = getThemeColor(
+                    "--season-current-fill",
+                );
+                const seasonPrev = getThemeColor("--season-prev");
+                const seasonPrevFill = getThemeColor("--season-prev-fill");
+                const seasonOld = getThemeColor("--season-old");
+                const seasonOldFill = getThemeColor("--season-old-fill");
+
+                // ─── Seasons ───
+                dashData.seasons.forEach((season, idx) => {
+                    const r = season.records;
+                    if (!r || r.length === 0) return;
+
+                    // Apply theme-specific colors
+                    let lineColor, fillColor;
+                    if (season.config.isCurrent) {
+                        lineColor = seasonCurrent;
+                        fillColor = seasonCurrentFill;
+                    } else if (idx === dashData.seasons.length - 2) {
+                        lineColor = seasonPrev;
+                        fillColor = seasonPrevFill;
+                    } else {
+                        lineColor = seasonOld;
+                        fillColor = seasonOldFill;
+                    }
+
+                    traces.push({
+                        x: r.map((d) => d.daysElapsed),
+                        y: r.map((d) => d.full),
+                        type: "scatter",
+                        mode: "lines",
+                        name: season.config.name,
+                        line: {
+                            color: lineColor,
+                            width: season.config.isCurrent ? 4 : 3,
+                            dash: season.config.dash,
+                        },
+                        fill: season.config.isCurrent ? "tozeroy" : "none",
+                        fillcolor: fillColor,
+                        customdata: r.map((d) => [
+                            d.dateStr,
+                            d.full.toFixed(1),
+                        ]),
+                        hovertemplate:
+                            "<b>%{customdata[0]}</b><br>" +
+                            "Fill: <b>%{customdata[1]}%</b><extra></extra>",
+                        legendgroup: "seasons",
+                        legendgrouptitle: { text: "Seasons" },
+                    });
+                });
+
+                // Current position marker with percentage label
+                const currentSeason = dashData.seasons.find(
+                    (s) => s.config.isCurrent,
+                );
+                if (currentSeason?.records?.length > 0) {
+                    const last = currentSeason.records.at(-1);
+                    const markerColor = seasonCurrent;
+
+                    traces.push({
+                        x: [last.daysElapsed],
+                        y: [last.full],
+                        type: "scatter",
+                        mode: "markers+text",
+                        name: "Today",
+                        marker: {
+                            color: markerColor,
+                            size: 13,
+                            symbol: "circle",
+                            line: {
+                                color: isDark ? "#161b22" : "white",
+                                width: 2.5,
+                            },
+                        },
+                        text: [last.full.toFixed(1) + "%"],
+                        textposition: "top center",
+                        textfont: { size: 11, color: markerColor, weight: 700 },
+                        hovertemplate:
+                            "<b>📍 TODAY</b><br>" +
+                            "Fill: <b>" +
+                            last.full.toFixed(1) +
+                            "%</b><br>" +
+                            last.dateStr +
+                            "<extra></extra>",
+                        showlegend: false,
+                        xaxis: "x",
+                        yaxis: "y",
+                    });
+                }
+
+                // ─── Scenarios ───
+                if (dashData.scenarios && Array.isArray(dashData.scenarios)) {
+                    dashData.scenarios.forEach((sc) => {
+                        const show =
+                            activeScenario === "All" ||
+                            activeScenario === sc.name;
+                        if (!show || !sc.points?.length) return;
+
+                        const scColor = sc.color;
+                        traces.push({
+                            x: sc.points.map((p) => p.x),
+                            y: sc.points.map((p) => p.y),
+                            type: "scatter",
+                            mode: "lines",
+                            name: sc.label,
+                            line: { color: scColor, width: 2.5, dash: sc.dash },
+                            customdata: sc.points.map((p) => [
+                                p.hoverDate,
+                                p.y.toFixed(1),
+                            ]),
+                            hovertemplate:
+                                "<b>%{customdata[0]}</b><br>" +
+                                sc.label +
+                                ": <b>%{customdata[1]}%</b><extra></extra>",
+                            legendgroup: "forecast",
+                            legendgrouptitle: { text: "Forecast" },
+                        });
+
+                        // Add critical hit date marker if scenario hits 10%
+                        if (sc.hitDate) {
+                            const lp = sc.points.at(-1);
+                            traces.push({
+                                x: [lp.x],
+                                y: [10],
+                                type: "scatter",
+                                mode: "markers+text",
+                                marker: {
+                                    symbol: "x-thin",
+                                    color: scColor,
+                                    size: 15,
+                                    line: { width: 3, color: scColor },
+                                },
+                                text: ["  " + sc.hitDate],
+                                textposition: "top right",
+                                textfont: {
+                                    color: scColor,
+                                    size: 11,
+                                    weight: 700,
+                                },
+                                showlegend: false,
+                                hovertemplate:
+                                    "⚠️ Critical: " +
+                                    sc.hitDate +
+                                    "<extra></extra>",
+                                xaxis: "x",
+                                yaxis: "y",
+                            });
+                        }
+                    });
+                }
+
+                // ─── Daily Change ───
+                if (currentSeason && currentSeason.records.length > 0) {
+                    const r = currentSeason.records;
+
+                    const delta = r.map((d, i) =>
+                        i === 0 ? 0 : d.full - r[i - 1].full,
+                    );
+
+                    // Bars for net change (positive = green, negative = red)
+                    const barColors = delta.map((d) =>
+                        d >= 0 ? "rgba(46,204,113,0.6)" : "rgba(231,76,60,0.6)",
+                    );
+                    const barBorders = delta.map((d) =>
+                        d >= 0 ? "rgba(46,204,113,0.9)" : "rgba(231,76,60,0.9)",
+                    );
+
+                    traces.push({
+                        x: r.map((d) => d.daysElapsed),
+                        y: delta,
+                        type: "bar",
+                        name: "Daily Δ",
+                        marker: {
+                            color: barColors,
+                            line: { color: barBorders, width: 0.5 },
+                        },
+                        customdata: r.map((d, i) => [
+                            d.dateStr,
+                            delta[i].toFixed(3),
+                        ]),
+                        hovertemplate:
+                            "<b>%{customdata[0]}</b><br>" +
+                            "Δ: <b>%{customdata[1]}%</b><extra></extra>",
+                        xaxis: "x2",
+                        yaxis: "y2",
+                        showlegend: false,
+                    });
+
+                    // 7d MA trend line
+                    traces.push({
+                        x: r.map((d) => d.daysElapsed),
+                        y: r.map((d) => d.trendMa7),
+                        type: "scatter",
+                        mode: "lines",
+                        name: "7d Moving Avg",
+                        line: {
+                            color: isDark ? "#6e7781" : "#2c3e50",
+                            width: 2,
+                        },
+                        customdata: r.map((d) => [
+                            d.dateStr,
+                            d.trendMa7.toFixed(3),
+                        ]),
+                        hovertemplate:
+                            "<b>%{customdata[0]}</b><br>" +
+                            "7d Avg: <b>%{customdata[1]}%</b><extra></extra>",
+                        xaxis: "x2",
+                        yaxis: "y2",
+                        legendgroup: "daily",
+                        legendgrouptitle: { text: "Daily" },
+                    });
+
+                    // ─── Withdrawal Composition (stacked bars) ───
+                    const withdrawal = r.map((d) => Math.abs(d.withdrawal));
+                    const injection = r.map((d) => d.injection);
+                    const total = withdrawal.map(
+                        (w, i) => w + Math.abs(injection[i]),
+                    );
+
+                    const injOffset = injection.map((inj) =>
+                        inj < 0 ? 0 : inj,
+                    );
+
+                    traces.push({
+                        x: r.map((d) => d.daysElapsed),
+                        y: withdrawal.map((v, i) =>
+                            total[i] > 0 ? (v / total[i]) * 100 : 0,
+                        ),
+                        type: "bar",
+                        name: "Net Withdrawal",
+                        marker: {
+                            color: "rgba(231,76,60,0.65)",
+                            line: { color: "rgba(231,76,60,0.9)", width: 0.5 },
+                        },
+                        customdata: r.map((d, i) => [
+                            d.dateStr,
+                            withdrawal[i].toFixed(1),
+                        ]),
+                        hovertemplate:
+                            "<b>%{customdata[0]}</b><br>" +
+                            "Net Draw: <b>%{y:.0f}%</b> (%{customdata[1]} GWh)<extra></extra>",
+                        xaxis: "x3",
+                        yaxis: "y3",
+                        legendgroup: "composition",
+                        legendgrouptitle: { text: "Composition" },
+                    });
+
+                    traces.push({
+                        x: r.map((d) => d.daysElapsed),
+                        y: injOffset.map((v, i) => (v / total[i]) * 100),
+                        type: "bar",
+                        name: "Injection Offset",
+                        marker: {
+                            color: "rgba(46,204,113,0.65)",
+                            line: { color: "rgba(46,204,113,0.9)", width: 0.5 },
+                        },
+                        customdata: r.map((d, i) => [
+                            d.dateStr,
+                            injOffset[i].toFixed(1),
+                        ]),
+                        hovertemplate:
+                            "<b>%{customdata[0]}</b><br>" +
+                            "Injection: <b>%{y:.0f}%</b> (%{customdata[1]} GWh)<extra></extra>",
+                        xaxis: "x3",
+                        yaxis: "y3",
+                        legendgroup: "composition",
+                    });
+                }
+
+                // ═══ Layout ═══
+
+                const gridColor = getThemeColor("--chart-grid");
+                const chartBg = getThemeColor("--chart-bg");
+                const chartPaper = getThemeColor("--chart-paper");
+                const hoverBg = getThemeColor("--chart-hover-bg");
+                const hoverBorder = getThemeColor("--chart-hover-border");
+                const legendBg = getThemeColor("--chart-legend-bg");
+                const legendBorder = getThemeColor("--chart-legend-border");
+                const modebarBg = getThemeColor("--chart-modebar-bg");
+                const modebarColor = getThemeColor("--chart-modebar-color");
+                const annotationColor = getThemeColor("--chart-annotation");
+
+                const layout = {
+                    grid: {
+                        rows: 3,
+                        columns: 1,
+                        subplots: [["xy"], ["x2y2"], ["x3y3"]],
+                        roworder: "top to bottom",
+                        pattern: "independent",
+                    },
+
+                    // Row 1: Fill Level (top chart) - reduced height to make room
+                    yaxis: {
+                        domain: [0.54, 1.0],
+                        title: {
+                            text: "<b>Fill Level</b>",
+                            font: { size: 12, color: annotationColor },
+                        },
+                        range: [0, 105],
+                        ticksuffix: "%",
+                        gridcolor: gridColor,
+                        zeroline: false,
+                        tickfont: { color: annotationColor },
+                    },
+                    xaxis: {
+                        range: xRange,
+                        tickmode: "array",
+                        tickvals: dashData.tickVals,
+                        ticktext: dashData.tickLabels,
+                        tickangle: -45,
+                        tickfont: { size: 10, color: annotationColor },
+                        gridcolor: gridColor,
+                        matches: "x3",
+                        zeroline: false,
+                    },
+
+                    // Row 2: Daily Change (middle chart) - moved down significantly
+                    yaxis2: {
+                        domain: [0.2, 0.42],
+                        title: {
+                            text: "<b>Daily Δ</b>",
+                            font: { size: 11, color: annotationColor },
+                        },
+                        ticksuffix: "%",
+                        zeroline: true,
+                        zerolinecolor: isDark
+                            ? "rgba(255,255,255,0.15)"
+                            : "rgba(0,0,0,0.15)",
+                        zerolinewidth: 1,
+                        gridcolor: gridColor,
+                        tickfont: { color: annotationColor },
+                    },
+                    xaxis2: {
+                        range: xRange,
+                        showticklabels: false,
+                        gridcolor: gridColor,
+                        matches: "x3",
+                        zeroline: false,
+                    },
+
+                    // Row 3: Composition (bottom chart) - increased size slightly
+                    yaxis3: {
+                        domain: [0.0, 0.16],
+                        title: {
+                            text: "<b>Mix</b>",
+                            font: { size: 11, color: annotationColor },
+                        },
+                        range: [0, 105],
+                        tickvals: [0, 50, 100],
+                        ticksuffix: "%",
+                        gridcolor: gridColor,
+                        zeroline: false,
+                        tickfont: { color: annotationColor },
+                    },
+                    xaxis3: {
+                        range: xRange,
+                        tickmode: "array",
+                        tickvals: dashData.tickVals,
+                        ticktext: dashData.tickLabels,
+                        tickangle: -45,
+                        tickfont: { size: 10, color: annotationColor },
+                        gridcolor: gridColor,
+                        zeroline: false,
+                    },
+
+                    // Shapes — critical zone
+                    shapes: [
+                        {
+                            type: "rect",
+                            xref: "x",
+                            yref: "y",
+                            x0: xRange[0],
+                            x1: xRange[1],
+                            y0: 0,
+                            y1: 10,
+                            fillcolor: isDark
+                                ? "rgba(255,107,107,0.08)"
+                                : "rgba(231,64,64,0.06)",
+                            line: {
+                                color: isDark
+                                    ? "rgba(255,107,107,0.4)"
+                                    : "rgba(231,76,60,0.35)",
+                                width: 1.5,
+                                dash: "dash",
+                            },
+                        },
+                    ],
+
+                    annotations: [
+                        // Critical label
+                        {
+                            x: 8,
+                            y: 5,
+                            xref: "x",
+                            yref: "y",
+                            text: "<b>⚠ CRITICAL</b>",
+                            showarrow: false,
+                            font: {
+                                color: isDark
+                                    ? "rgba(255,107,107,0.7)"
+                                    : "rgba(222,57,43,0.6)",
+                                size: 12,
+                            },
+                        },
+                        {
+                            text: "<b>Daily Net Change</b>",
+                            font: { size: 12, color: annotationColor },
+                            xref: "paper",
+                            yref: "paper",
+                            x: 0.01,
+                            y: 0.42,
+                            showarrow: false,
+                            xanchor: "left",
+                            yanchor: "bottom",
+                        },
+                        {
+                            text: "<b>Withdrawal Composition</b>",
+                            font: { size: 12, color: annotationColor },
+                            xref: "paper",
+                            yref: "paper",
+                            x: 0.01,
+                            y: 0.16,
+                            showarrow: false,
+                            xanchor: "left",
+                            yanchor: "bottom",
+                        },
+                    ],
+
+                    barmode: "stack",
+                    hovermode: "x unified",
+                    hoverlabel: {
+                        bgcolor: hoverBg,
+                        bordercolor: hoverBorder,
+                        font: {
+                            size: 12,
+                            family: "Inter, system-ui, sans-serif",
+                        },
+                    },
+
+                    legend: {
+                        orientation: "v",
+                        x: 1.01,
+                        y: 0.5,
+                        xanchor: "left",
+                        bgcolor: legendBg,
+                        bordercolor: legendBorder,
+                        borderwidth: 1,
+                        font: { size: 10.5, color: annotationColor },
+                        tracegroupgap: 8,
+                        itemsizing: "constant",
+                        itemwidth: 30,
+                    },
+
+                    margin: { t: 15, l: 55, r: 160, b: 55 },
+                    font: {
+                        family: "Inter, Segoe UI, system-ui, sans-serif",
+                        color: annotationColor,
+                    },
+                    plot_bgcolor: chartBg,
+                    paper_bgcolor: chartPaper,
+
+                    modebar: {
+                        bgcolor: modebarBg,
+                        color: modebarColor,
+                        activecolor: getThemeColor("--primary"),
+                        orientation: "v",
+                    },
+                };
+
+                const config = {
+                    responsive: true,
+                    displayModeBar: true,
+                    displaylogo: false,
+                    modeBarButtonsToRemove: [
+                        "lasso2d",
+                        "select2d",
+                        "autoScale2d",
+                    ],
+                    toImageButtonOptions: {
+                        format: "png",
+                        filename:
+                            "gas_storage_" +
+                            new Date().toISOString().slice(0, 10),
+                        height: 900,
+                        width: 1600,
+                        scale: 2,
+                    },
+                    scrollZoom: true,
+                };
+
+                const dashboardDiv = document.getElementById("dashboard");
+                if (!dashboardDiv) {
+                    console.error("Dashboard div not found");
+                    return;
+                }
+
+                console.log(
+                    "Calling Plotly.react with",
+                    traces.length,
+                    "traces",
+                );
+                Plotly.react(dashboardDiv, traces, layout, config);
+                console.log("Chart rendered successfully");
+            }
+
+            // ═══════════════════════════════════════════════════════
+            // Initialize
+            // ═══════════════════════════════════════════════════════
+
+            console.log("Initializing dashboard...");
+            fetchData();
+        </script>
+    </body>
+</html>
