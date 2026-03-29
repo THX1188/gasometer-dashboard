@@ -25,7 +25,7 @@ const (
 	apiURL            = "https://agsi.gie.eu/api"
 	country           = "DE"
 	winterStartMD     = "11-01"
-	targetEndMD       = "03-31"
+	targetEndMD       = "04-30"
 	criticalThreshold = 10.0
 	trendWindow       = 14
 	stressMultiplier  = 1.25
@@ -540,7 +540,7 @@ func generateTicks(startYear int) ([]int, []string) {
 	var labels []string
 	startStr := fmt.Sprintf("%d-%s", startYear, winterStartMD)
 	start, _ := time.Parse("2006-01-02", startStr)
-	for d := 0; d < 180; d += 7 {
+	for d := 0; d < 182; d += 7 {
 		vals = append(vals, d)
 		labels = append(labels, start.AddDate(0, 0, d).Format("02 Jan"))
 	}
@@ -561,27 +561,41 @@ func buildDashboard() (*DashboardData, error) {
 	log.Printf("  📅 Current winter start year: %d (season %d/%02d)",
 		cwsy, cwsy, (cwsy+1)%100)
 
-	// Build season configs: 2 prior + current
+	// Build season configs: 4 prior + current (5 total)
 	configs := []SeasonConfig{
+		{
+			Year:  cwsy - 4,
+			Name:  fmt.Sprintf("Winter %d/%02d", cwsy-4, (cwsy-3)%100),
+			Color: "#bdc3c7", Width: 2, Dash: "dot",
+			FillColor: "rgba(189,195,199,0.05)",
+			IsCurrent: false,
+		},
+		{
+			Year:  cwsy - 3,
+			Name:  fmt.Sprintf("Winter %d/%02d", cwsy-3, (cwsy-2)%100),
+			Color: "#7f8c8d", Width: 2, Dash: "dot",
+			FillColor: "rgba(127,140,141,0.06)",
+			IsCurrent: false,
+		},
 		{
 			Year:  cwsy - 2,
 			Name:  fmt.Sprintf("Winter %d/%02d", cwsy-2, (cwsy-1)%100),
-			Color: "#95a5a6", Width: 3, Dash: "dash",
-			FillColor: "rgba(149,165,166,0.08)",
+			Color: "#7c3aed", Width: 3, Dash: "solid",
+			FillColor: "rgba(124,58,237,0.08)",
 			IsCurrent: false,
 		},
 		{
 			Year:  cwsy - 1,
 			Name:  fmt.Sprintf("Winter %d/%02d", cwsy-1, cwsy%100),
-			Color: "#e67e22", Width: 3, Dash: "dash",
-			FillColor: "rgba(230,126,34,0.10)",
+			Color: "#059669", Width: 3, Dash: "solid",
+			FillColor: "rgba(5,150,105,0.10)",
 			IsCurrent: false,
 		},
 		{
 			Year:  cwsy,
 			Name:  fmt.Sprintf("Winter %d/%02d (Current)", cwsy, (cwsy+1)%100),
-			Color: "#004080", Width: 4, Dash: "solid",
-			FillColor: "rgba(0,64,128,0.18)",
+			Color: "#2563eb", Width: 4, Dash: "solid",
+			FillColor: "rgba(37,99,235,0.18)",
 			IsCurrent: true,
 		},
 	}
