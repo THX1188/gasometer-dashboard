@@ -41,12 +41,16 @@
                 --chart-annotation: #323232;
 
                 /* Season colors - light mode */
-                --season-current: #004080;
-                --season-current-fill: rgba(0, 64, 128, 0.18);
-                --season-prev: #e67e22;
-                --season-prev-fill: rgba(230, 126, 34, 0.1);
-                --season-old: #95a5a6;
-                --season-old-fill: rgba(149, 165, 166, 0.08);
+                --season-current: #2563eb;
+                --season-current-fill: rgba(37, 99, 235, 0.18);
+                --season-prev: #059669;
+                --season-prev-fill: rgba(5, 150, 105, 0.1);
+                --season-old: #7c3aed;
+                --season-old-fill: rgba(124, 58, 237, 0.08);
+                --season-older: #7f8c8d;
+                --season-older-fill: rgba(127, 140, 141, 0.06);
+                --season-oldest: #bdc3c7;
+                --season-oldest-fill: rgba(189, 195, 199, 0.05);
             }
 
             [data-theme="dark"] {
@@ -76,12 +80,16 @@
                 --chart-annotation: #e6edf3;
 
                 /* Season colors - dark mode (brightened for visibility) */
-                --season-current: #5eb3ff;
-                --season-current-fill: rgba(94, 179, 255, 0.15);
-                --season-prev: #ff9f4a;
-                --season-prev-fill: rgba(255, 159, 74, 0.12);
-                --season-old: #b4bcc4;
-                --season-old-fill: rgba(180, 188, 196, 0.1);
+                --season-current: #60a5fa;
+                --season-current-fill: rgba(96, 165, 250, 0.15);
+                --season-prev: #34d399;
+                --season-prev-fill: rgba(52, 211, 153, 0.12);
+                --season-old: #a78bfa;
+                --season-old-fill: rgba(167, 139, 250, 0.1);
+                --season-older: #9aa3ab;
+                --season-older-fill: rgba(154, 163, 171, 0.08);
+                --season-oldest: #d0d7dd;
+                --season-oldest-fill: rgba(208, 215, 221, 0.06);
             }
 
             * {
@@ -850,7 +858,7 @@
                 );
 
                 const traces = [];
-                const xRange = [0, 151];
+                const xRange = [0, 182];
 
                 // Get theme-aware colors
                 const currentTheme = htmlElement.getAttribute("data-theme");
@@ -864,23 +872,41 @@
                 const seasonPrevFill = getThemeColor("--season-prev-fill");
                 const seasonOld = getThemeColor("--season-old");
                 const seasonOldFill = getThemeColor("--season-old-fill");
+                const seasonOlder = getThemeColor("--season-older");
+                const seasonOlderFill = getThemeColor("--season-older-fill");
+                const seasonOldest = getThemeColor("--season-oldest");
+                const seasonOldestFill = getThemeColor("--season-oldest-fill");
 
                 // ─── Seasons ───
                 dashData.seasons.forEach((season, idx) => {
                     const r = season.records;
                     if (!r || r.length === 0) return;
 
-                    // Apply theme-specific colors
+                    // Apply theme-specific colors based on position (5 seasons)
+                    // idx 0 = oldest, idx 1 = older, idx 2 = old, idx 3 = prev, idx 4 = current
                     let lineColor, fillColor;
+                    const seasonCount = dashData.seasons.length;
+                    const posFromEnd = seasonCount - 1 - idx;
+                    
                     if (season.config.isCurrent) {
                         lineColor = seasonCurrent;
                         fillColor = seasonCurrentFill;
-                    } else if (idx === dashData.seasons.length - 2) {
+                    } else if (posFromEnd === 1) {
+                        // Previous season
                         lineColor = seasonPrev;
                         fillColor = seasonPrevFill;
-                    } else {
+                    } else if (posFromEnd === 2) {
+                        // Old season
                         lineColor = seasonOld;
                         fillColor = seasonOldFill;
+                    } else if (posFromEnd === 3) {
+                        // Older season
+                        lineColor = seasonOlder;
+                        fillColor = seasonOlderFill;
+                    } else {
+                        // Oldest season(s)
+                        lineColor = seasonOldest;
+                        fillColor = seasonOldestFill;
                     }
 
                     traces.push({
@@ -1069,60 +1095,51 @@
                         legendgrouptitle: { text: "Daily" },
                     });
 
-                    // ─── Withdrawal Composition (stacked bars) ───
-                    const withdrawal = r.map((d) => Math.abs(d.withdrawal));
-                    const injection = r.map((d) => d.injection);
-                    const total = withdrawal.map(
-                        (w, i) => w + Math.abs(injection[i]),
-                    );
-
-                    const injOffset = injection.map((inj) =>
-                        inj < 0 ? 0 : inj,
-                    );
+                    // ─── Daily Flows (diverging bars: injection up, withdrawal down) ───
+                    const withdrawal = r.map((d) => -Math.abs(d.withdrawal));
+                    const injection = r.map((d) => Math.abs(d.injection));
 
                     traces.push({
                         x: r.map((d) => d.daysElapsed),
-                        y: withdrawal.map((v, i) =>
-                            total[i] > 0 ? (v / total[i]) * 100 : 0,
-                        ),
+                        y: injection,
                         type: "bar",
-                        name: "Net Withdrawal",
-                        marker: {
-                            color: "rgba(231,76,60,0.65)",
-                            line: { color: "rgba(231,76,60,0.9)", width: 0.5 },
-                        },
-                        customdata: r.map((d, i) => [
-                            d.dateStr,
-                            withdrawal[i].toFixed(1),
-                        ]),
-                        hovertemplate:
-                            "<b>%{customdata[0]}</b><br>" +
-                            "Net Draw: <b>%{y:.0f}%</b> (%{customdata[1]} GWh)<extra></extra>",
-                        xaxis: "x3",
-                        yaxis: "y3",
-                        legendgroup: "composition",
-                        legendgrouptitle: { text: "Composition" },
-                    });
-
-                    traces.push({
-                        x: r.map((d) => d.daysElapsed),
-                        y: injOffset.map((v, i) => (v / total[i]) * 100),
-                        type: "bar",
-                        name: "Injection Offset",
+                        name: "Injection",
                         marker: {
                             color: "rgba(46,204,113,0.65)",
                             line: { color: "rgba(46,204,113,0.9)", width: 0.5 },
                         },
                         customdata: r.map((d, i) => [
                             d.dateStr,
-                            injOffset[i].toFixed(1),
+                            injection[i].toFixed(0),
                         ]),
                         hovertemplate:
                             "<b>%{customdata[0]}</b><br>" +
-                            "Injection: <b>%{y:.0f}%</b> (%{customdata[1]} GWh)<extra></extra>",
+                            "Injection: <b>%{customdata[1]} GWh</b><extra></extra>",
                         xaxis: "x3",
                         yaxis: "y3",
-                        legendgroup: "composition",
+                        legendgroup: "flows",
+                        legendgrouptitle: { text: "Daily Flows" },
+                    });
+
+                    traces.push({
+                        x: r.map((d) => d.daysElapsed),
+                        y: withdrawal,
+                        type: "bar",
+                        name: "Withdrawal",
+                        marker: {
+                            color: "rgba(231,76,60,0.65)",
+                            line: { color: "rgba(231,76,60,0.9)", width: 0.5 },
+                        },
+                        customdata: r.map((d, i) => [
+                            d.dateStr,
+                            Math.abs(withdrawal[i]).toFixed(0),
+                        ]),
+                        hovertemplate:
+                            "<b>%{customdata[0]}</b><br>" +
+                            "Withdrawal: <b>%{customdata[1]} GWh</b><extra></extra>",
+                        xaxis: "x3",
+                        yaxis: "y3",
+                        legendgroup: "flows",
                     });
                 }
 
@@ -1150,7 +1167,7 @@
 
                     // Row 1: Fill Level (top chart) - reduced height to make room
                     yaxis: {
-                        domain: [0.54, 1.0],
+                        domain: [0.52, 1.0],
                         title: {
                             text: "<b>Fill Level</b>",
                             font: { size: 12, color: annotationColor },
@@ -1173,9 +1190,9 @@
                         zeroline: false,
                     },
 
-                    // Row 2: Daily Change (middle chart) - moved down significantly
+                    // Row 2: Daily Change (middle chart)
                     yaxis2: {
-                        domain: [0.2, 0.42],
+                        domain: [0.27, 0.47],
                         title: {
                             text: "<b>Daily Δ</b>",
                             font: { size: 11, color: annotationColor },
@@ -1197,18 +1214,19 @@
                         zeroline: false,
                     },
 
-                    // Row 3: Composition (bottom chart) - increased size slightly
+                    // Row 3: Daily Flows (bottom chart)
                     yaxis3: {
-                        domain: [0.0, 0.16],
+                        domain: [0.0, 0.22],
                         title: {
-                            text: "<b>Mix</b>",
+                            text: "<b>GWh</b>",
                             font: { size: 11, color: annotationColor },
                         },
-                        range: [0, 105],
-                        tickvals: [0, 50, 100],
-                        ticksuffix: "%",
                         gridcolor: gridColor,
-                        zeroline: false,
+                        zeroline: true,
+                        zerolinecolor: isDark
+                            ? "rgba(255,255,255,0.2)"
+                            : "rgba(0,0,0,0.2)",
+                        zerolinewidth: 1,
                         tickfont: { color: annotationColor },
                     },
                     xaxis3: {
@@ -1267,25 +1285,25 @@
                             xref: "paper",
                             yref: "paper",
                             x: 0.01,
-                            y: 0.42,
+                            y: 0.47,
                             showarrow: false,
                             xanchor: "left",
                             yanchor: "bottom",
                         },
                         {
-                            text: "<b>Withdrawal Composition</b>",
+                            text: "<b>Daily Flows (Injection ↑ / Withdrawal ↓)</b>",
                             font: { size: 12, color: annotationColor },
                             xref: "paper",
                             yref: "paper",
                             x: 0.01,
-                            y: 0.16,
+                            y: 0.22,
                             showarrow: false,
                             xanchor: "left",
                             yanchor: "bottom",
                         },
                     ],
 
-                    barmode: "stack",
+                    barmode: "relative",
                     hovermode: "x unified",
                     hoverlabel: {
                         bgcolor: hoverBg,
